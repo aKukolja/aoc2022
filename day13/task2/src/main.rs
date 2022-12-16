@@ -1,4 +1,4 @@
-/i/iserde::Deserialize;
+use serde::Deserialize;
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
@@ -62,68 +62,51 @@ fn compare(left: &Task, right: &Task) -> Ordering {
     }
 }
 
-#[derive(Default)]
-struct Pair {
-    l1: Option<Task>,
-    l2: Option<Task>
+impl Ord for Task {
+    fn cmp(&self, other: &Self) -> Ordering {
+        compare(self, other)
+    }
 }
 
-impl Pair {
-    fn consume(&mut self) -> bool {
-        if self.l1.is_none() {
-            panic!("Missing first");
-        }
-        if self.l2.is_none() {
-            panic!("Missing first");
-        }
-        let retval = compare(&self.l1.as_ref().unwrap(), &self.l2.as_ref().unwrap());
-        self.l1 = None;
-        self.l2 = None;
-        match retval {
-            Ordering::Less => true,
+impl PartialOrd for Task {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(compare(self, other))
+    }
+}
+
+impl PartialEq for Task {
+    fn eq(&self, other: &Self) -> bool {
+        match compare(self, other) {
+            Ordering::Equal => true,
             _ => false
         }
     }
-    fn add_list(&mut self, tl: Task) -> () {
-        if self.l1.is_none() {
-            self.l1 = Some(tl);
-            return;
-        }
-        if self.l2.is_none() {
-            self.l2 = Some(tl);
-            return;
-        }
-        panic!("Already have two Task");
-    }
-    fn full(&self) -> bool {
-        return self.l1.is_some() && self.l2.is_some();
-    }
 }
+
+impl Eq for Task {}
 
 fn main() {
     if let Ok(lines) = read_lines("../input.txt") {
-        let mut p = Pair::default();
-        let mut sum = 0;
-        let mut i = 0;
+        let sentinels: Vec<Task> = vec![
+            serde_json::from_str("[[2]]").unwrap(),
+            serde_json::from_str("[[6]]").unwrap()
+        ];
+        let mut e: Vec<Task> = Vec::new();
+        e.push(sentinels[0].clone());
+        e.push(sentinels[1].clone());
         for line in lines {
             if let Ok(as_str) = line {
                 if as_str.len() != 0 {
                     let l: Task = serde_json::from_str(&as_str).unwrap();
-                    p.add_list(l);
-                    if p.full() {
-                        i += 1;
-                        if p.consume() {
-                            sum += i;
-                        }
-                    }
+                    e.push(l);
                 }
             }
         }
-        println!("{}", sum);
+        e.sort();
+        let retval = sentinels.iter().map(|s| e.binary_search(s).unwrap() + 1).product::<usize>();
+        println!("{}", retval);
     }
 }
-
-
 
 
 fn read_lines<P> (filename: P) -> io::Result<io::Lines<io::BufReader<File>>> where P: AsRef<Path> {
