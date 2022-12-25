@@ -6,7 +6,6 @@ use std::path::Path;
 
 const ITER_LIMIT: u64 = 1000000000000;
 const MAX_HEIGHT: u64 = 100000; // should be high enough
-const BUFF_SIZE: u64 = MAX_HEIGHT / 2;
 
 enum Direction {
     Left,
@@ -151,6 +150,20 @@ impl Cave {
     }
 }
 
+fn visible_slice(cave: &Cave) -> Vec<u8> {
+    /* 
+    let mut agg: u8 = 0b00000000;
+
+    for i in (0..cave.max_height+1).rev() { // scan top to bottom
+        agg |= cave.space[i as usize];
+        if agg == 0b01111111 {
+            return cave.space[i as usize..cave.max_height as usize].to_vec();
+        }
+    }
+    */
+    return cave.space[(cave.max_height-127) as usize ..(cave.max_height+1) as usize].to_vec();
+}
+
 fn spinner(wind: Vec<Direction>) -> u64 {
     let mut rocks = [LINE, CROSS, EL, VERTICAL, SQUARE]
         .iter()
@@ -159,25 +172,27 @@ fn spinner(wind: Vec<Direction>) -> u64 {
     let mut current_rock: Rock = [0; 4];
     let mut cave = Cave::new();
     let mut wind_iter = wind.iter().enumerate().cycle().peekable();
-    let mut history: HashMap<(u8, usize, usize), u64> = HashMap::new();
+    let mut history: HashMap<(Vec<u8>, usize, usize), u64> = HashMap::new();
     let mut heights: [u64; MAX_HEIGHT as usize] = [0; MAX_HEIGHT as usize];
 
-    for rock_to_place in 0..BUFF_SIZE {
+    for rock_to_place in 0..ITER_LIMIT{
         let (rock_index, rock) = rocks.next().unwrap();
         let (starting_wind_index, _) = wind_iter.peek().unwrap();
+        if rock_to_place > 10000 {
         if let Some(old_rock_to_place) = history.insert(
             (
-                cave.space[cave.max_height as usize],
+                visible_slice(&cave),
                 rock_index,
                 *starting_wind_index,
             ),
             rock_to_place,
         ) {
-            //
             let q = (ITER_LIMIT - old_rock_to_place) / (rock_to_place - old_rock_to_place);
             let r = (ITER_LIMIT - old_rock_to_place) % (rock_to_place - old_rock_to_place);
-            return heights[(old_rock_to_place + r) as usize]
-                + q * (cave.max_height - heights[old_rock_to_place as usize]);
+            // off by one, come on man
+            return heights[(old_rock_to_place + r - 1) as usize]
+                + q * (cave.max_height - heights[old_rock_to_place as usize - 1]);
+        }
         }
 
         current_rock.copy_from_slice(rock); // copy faster than allocation
